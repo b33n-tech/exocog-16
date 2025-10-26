@@ -3,10 +3,6 @@ const taskInput = document.getElementById("taskInput");
 const addBtn = document.getElementById("addBtn");
 const archiveBtn = document.getElementById("archiveBtn");
 const tasksContainer = document.getElementById("tasksContainer");
-const copiedMsg = document.createElement("span");
-copiedMsg.style.color = "green";
-copiedMsg.style.display = "none";
-document.body.appendChild(copiedMsg);
 const clearBtn = document.getElementById("clearBtn");
 const restoreBtn = document.getElementById("restoreBtn");
 const restoreInput = document.getElementById("restoreInput");
@@ -30,11 +26,14 @@ let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
 let llmData = null;
 
 // --- Utils ---
-function formatDate(iso){const d=new Date(iso);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+function formatDate(iso) {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
 
 // --- Render Tasks ---
-function renderTasks(){
-  tasksContainer.innerHTML="";
+function renderTasks() {
+  tasksContainer.innerHTML = "";
   tasks.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach((task,i)=>{
     const li = document.createElement("li");
     li.className = "task-item";
@@ -64,7 +63,7 @@ function renderTasks(){
     const commentBtn = document.createElement("button");
     commentBtn.textContent="+";
     commentBtn.addEventListener("click", ()=>{
-      const val=commentInput.value.trim();
+      const val = commentInput.value.trim();
       if(val!==""){
         if(!task.comments) task.comments=[];
         task.comments.push({text:val,date:new Date().toISOString()});
@@ -81,15 +80,15 @@ function renderTasks(){
     li.appendChild(commentBlock);
     tasksContainer.appendChild(li);
 
-    taskText.addEventListener("click",()=>{
-      commentBlock.style.display = commentBlock.style.display==="none" ? "block" : "block"; // Toujours visible après click
+    taskText.addEventListener("click", ()=>{
+      commentBlock.style.display = commentBlock.style.display==="none" ? "block" : "none";
     });
   });
 }
 
 // --- Add Task ---
 addBtn.addEventListener("click", ()=>{
-  const text=taskInput.value.trim();
+  const text = taskInput.value.trim();
   if(text!==""){
     tasks.push({text,date:new Date().toISOString(),comments:[]});
     localStorage.setItem("tasks",JSON.stringify(tasks));
@@ -98,38 +97,38 @@ addBtn.addEventListener("click", ()=>{
   }
 });
 
-// --- Clear ---
+// --- Clear Tasks ---
 clearBtn.addEventListener("click", ()=>{
-  if(confirm("Es-tu sûr ?")){
+  if(confirm("Es-tu sûr ? Cette action est irréversible !")){
     tasks=[];
     localStorage.removeItem("tasks");
     renderTasks();
   }
 });
 
-// --- Archive ---
+// --- Archive Tasks ---
 archiveBtn.addEventListener("click", ()=>{
   if(tasks.length===0){alert("Aucune tâche à archiver !"); return;}
-  const blob=new Blob([JSON.stringify(tasks,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;
-  a.download=`taches_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.json`;
+  const blob = new Blob([JSON.stringify(tasks,null,2)],{type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `taches_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 });
 
-// --- Restore ---
+// --- Restore JSON ---
 restoreBtn.addEventListener("click", ()=>restoreInput.click());
 restoreInput.addEventListener("change", event=>{
-  const files=Array.from(event.target.files);
+  const files = Array.from(event.target.files);
   files.forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
       try{
-        const data=JSON.parse(e.target.result);
+        const data = JSON.parse(e.target.result);
         if(Array.isArray(data)) tasks=[...tasks,...data];
         localStorage.setItem("tasks",JSON.stringify(tasks));
         renderTasks();
@@ -140,39 +139,9 @@ restoreInput.addEventListener("change", event=>{
   });
 });
 
-// --- Push LLM ---
-pushLLMBtn.addEventListener("click", ()=>{
-  if(tasks.length===0){alert("Pas de tâches à envoyer !"); return;}
-  const prompt = buildPrompt(tasks);
-  navigator.clipboard.writeText(prompt).then(()=>{
-    window.open(llmSelect.value,"_blank");
-  });
-});
-
 // --- Build Prompt ---
 function buildPrompt(tasks){
-  let combined = "Tu es un assistant de gestion de projet. Je vais te donner un texte contenant des tâches, des notes et des informations diverses, souvent incomplètes, peu structurées ou dispersées. Ta mission est de :
-
-1. Identifier toutes les tâches explicites et implicites.
-2. Extraire les micro-actions et micro-micro-actions nécessaires pour chaque tâche.
-3. Identifier les dépendances entre tâches et actions.
-4. Extraire les messages à envoyer, les livrables, les réunions et autres modules pertinents.
-5. Préserver les commentaires ou notes associées aux tâches.
-6. Générer un JSON structuré strictement sous ce format :
-
-{
-  "jalons": [{"titre":"","datePrévue":"","sousActions":[{"texte":"","statut":""}]}],
-  "messages": [{"destinataire":"","sujet":"","texte":"","envoyé":false}],
-  "rdv": [{"titre":"","date":"","durée":"","participants":[""]}],
-  "autresModules": [{"titre":"","items":[{"nom":"","lien":""}]}],
-  "livrables": [{"titre":"","type":"","template":{}}]
-}
-
-- Tout ce qui n’est pas explicitement précisé mais logiquement nécessaire doit être inféré.
-- Les actions non datées peuvent recevoir une date par défaut aujourd’hui.
-- La structure JSON doit être strictement respectée et parsable.
-
-Voici le texte à traiter :\n\n";
+  let combined = "Tu es un assistant de gestion de projet. Voici une liste de tâches et commentaires. Analyse et crée un plan structuré JSON :\n\n";
   tasks.forEach(t=>{
     combined += "- "+t.text+"\n";
     if(t.comments?.length){
@@ -184,6 +153,15 @@ Voici le texte à traiter :\n\n";
   });
   return combined;
 }
+
+// --- Push LLM ---
+pushLLMBtn.addEventListener("click", ()=>{
+  if(tasks.length===0){alert("Pas de tâches à envoyer !"); return;}
+  const prompt = buildPrompt(tasks);
+  navigator.clipboard.writeText(prompt).then(()=>{
+    window.open(llmSelect.value,"_blank");
+  });
+});
 
 // --- Push JSON vers modules ---
 pushJsonBtn.addEventListener("click", ()=>{
@@ -202,8 +180,8 @@ function populateModules(){
   jalonsList.innerHTML="";
   if(llmData.jalons?.length){
     llmData.jalons.forEach(j=>{
-      const li=document.createElement("li");
-      li.innerHTML=`<strong>${j.titre}</strong> (Prévue: ${j.datePrévue || ''})<ul>${j.sousActions?.map(sa=>`<li><input type="checkbox"> ${sa.texte} (${sa.statut})</li>`).join('')}</ul>`;
+      const li = document.createElement("li");
+      li.innerHTML = `<strong>${j.titre}</strong> (Prévue: ${j.datePrévue || ''})<ul>${j.sousActions?.map(sa=>`<li><input type="checkbox"> ${sa.texte} (${sa.statut})</li>`).join('')}</ul>`;
       jalonsList.appendChild(li);
     });
   }
@@ -212,8 +190,8 @@ function populateModules(){
   messagesTableBody.innerHTML="";
   if(llmData.messages?.length){
     llmData.messages.forEach((m,i)=>{
-      const tr=document.createElement("tr");
-      tr.innerHTML=`<td><input type="checkbox"></td><td>${m.destinataire}</td><td>${m.sujet}</td><td>${m.texte}</td><td><input type="text" placeholder="Note…"></td>`;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><input type="checkbox"></td><td>${m.destinataire}</td><td>${m.sujet}</td><td>${m.texte}</td><td><input type="text" placeholder="Note…"></td>`;
       messagesTableBody.appendChild(tr);
     });
   }
@@ -221,10 +199,9 @@ function populateModules(){
   // Livrables
   livrablesList.innerHTML="";
   if(llmData.livrables?.length){
-    llrData = llmData.livrables;
     llmData.livrables.forEach((l,i)=>{
-      const li=document.createElement("li");
-      li.innerHTML=`<input type="checkbox"> ${l.titre} (${l.type}) <input type="text" placeholder="Note…">`;
+      const li = document.createElement("li");
+      li.innerHTML = `<input type="checkbox"> ${l.titre} (${l.type}) <input type="text" placeholder="Note…">`;
       livrablesList.appendChild(li);
     });
   }
