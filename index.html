@@ -9,19 +9,21 @@
   <!-- Barre de titre + LLM -->
   <header>
     <h1>Exosquelette Cognitif</h1>
-    <select id="llmSelect">
-      <option value="https://chat.openai.com">GPT</option>
-      <option value="https://app.perplexity.ai">Perplexity</option>
-      <option value="https://www.anthropic.com/claude">Claude</option>
-      <option value="https://mistral.ai">Mistral</option>
-    </select>
+    <div class="llm-container">
+      <label for="llmSelect">Choisir LLM:</label>
+      <select id="llmSelect">
+        <option value="https://chat.openai.com">GPT</option>
+        <option value="https://app.perplexity.ai">Perplexity</option>
+        <option value="https://www.anthropic.com/claude">Claude</option>
+        <option value="https://mistral.ai">Mistral</option>
+      </select>
+    </div>
   </header>
 
   <main>
     <!-- Colonne Gauche : Phase 1 -->
     <section class="phase1">
       <h2>Phase 1 : Saisie & Contexte</h2>
-
       <div class="input-task">
         <input type="text" id="taskInput" placeholder="Nouvelle tâche…">
         <button id="addBtn">Ajouter</button>
@@ -41,7 +43,6 @@
     <!-- Colonne Droite : Phase 2 -->
     <section class="phase2">
       <h2>Phase 2 : Exécution & Modules</h2>
-
       <textarea id="jsonPaste" placeholder="Collez ici le JSON du LLM…"></textarea>
       <button id="pushJsonBtn">Charger le Plan</button>
 
